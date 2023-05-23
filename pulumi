@@ -1,0 +1,89 @@
+Créez un projet Pulumi GCP en exécutant les commandes suivantes dans un terminal :
+
+mkdir ship && cd ship
+pulumi new gcp-typescript --name directus-app
+
+Assurez-vous d'avoir Pulumi et les dépendances nécessaires installées au préalable.
+Déployez un simple "storage bucket" en modifiant le fichier index.ts avec le code suivant :
+
+import * as pulumi from "@pulumi/pulumi";
+import * as gcp from "@pulumi/gcp";
+const bucketName = "my-storage-bucket";
+const bucket = new gcp.storage.Bucket(bucketName);
+
+Utilisez les commandes Git pour ajouter, valider et pousser les modifications vers le référentiel Git.
+Activez les services Artifact Registry et Cloud Run en modifiant le fichier index.ts avec le code suivant :
+
+import * as pulumi from "@pulumi/pulumi";
+import * as gcp from "@pulumi/gcp";
+
+const projectId = "directus-app-387009";
+const region = "europe";
+const repositoryId = "docker-repo-directus";
+
+// Activer l'API Artifact Registry
+const artifactRegistryApi = new gcp.projects.Service("artifact-registry-service", {
+  project: projectId,
+  service: "artifactregistry.googleapis.com",
+});
+
+// Activer l'API Cloud Run
+const cloudRunApi = new gcp.projects.Service("cloud-run-service", {
+  project: projectId,
+  service: "run.googleapis.com",
+});
+Déployez un "artifact registry" en Europe en modifiant le fichier index.ts avec le code suivant :
+import * as pulumi from "@pulumi/pulumi";
+import * as gcp from "@pulumi/gcp";
+const projectId = " directus-app-387009";
+const region = "europe";
+const repositoryId = "docker-repo-directus";
+const repository = new gcp.artifactregistry.Repository(repositoryId, {
+  repositoryId: repositoryId,
+  project: projectId,
+  location: region,
+  format: "DOCKER",
+});
+Construisez localement l'image Docker du client en exécutant les commandes suivantes dans le terminal :
+docker pull directus/directus
+docker images
+
+
+Vérifiez que l'image directus/directus est répertoriée.
+Configurez l'authentification Docker pour Artifact Registry en exécutant la commande suivante :
+
+gcloud auth configure-docker europe-west1-docker.pkg.dev
+
+Taguez et poussez l'image vers l'artifact registry en exécutant les commandes suivantes :
+
+docker tag directus/directus:latest europe-docker.pkg.dev/ directus-app-387009/docker-repo-directus/directus-image:latest
+docker push europe-docker.pkg.dev/directus-app-387009/docker-repo-directus/directus-image:latest
+
+Déployer un service Cloud Run en spécifiant les variables d'environement nécessaires :
+
+import * as pulumi from "@pulumi/pulumi";
+import * as gcp from "@pulumi/gcp";
+
+const projectId = " directus-app-387009";
+const region = "europe";
+const repositoryId = "docker-repo-directus";
+const imageTag = "latest";
+
+const service = new gcp.cloudrun.Service("directus-cloud-run", {
+  project: projectId,
+  location: region,
+  template: {
+    spec: {
+      containers: [
+        {
+          image: `europe-west1 docker.pkg.dev/${projectId}/${repositoryId}/directus-image:${imageTag}`,
+          envs: [
+            { name: "KEY", value: "255d861b-5ea1-5996-9aa3-922530ec40b1" },
+            { name: "SECRET", value: "6116487b-cda1-52c2-b5b5-c8022c45e263" },
+          ],
+        },
+      ],
+    },
+  },
+});
+
